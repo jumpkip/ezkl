@@ -4,8 +4,8 @@ use crate::circuit::modules::poseidon::{
     PoseidonChip,
 };
 use crate::circuit::modules::Module;
+use crate::circuit::CheckMode;
 use crate::circuit::InputType;
-use crate::circuit::{CheckMode, Tolerance};
 use crate::commands::*;
 use crate::fieldutils::{felt_to_integer_rep, integer_rep_to_felt, IntegerRep};
 use crate::graph::TestDataSource;
@@ -156,9 +156,6 @@ impl pyo3::ToPyObject for PyG1Affine {
 #[gen_stub_pyclass]
 struct PyRunArgs {
     #[pyo3(get, set)]
-    /// float: The tolerance for error on model outputs
-    pub tolerance: f32,
-    #[pyo3(get, set)]
     /// int: The denominator in the fixed point representation used when quantizing inputs
     pub input_scale: crate::Scale,
     #[pyo3(get, set)]
@@ -225,7 +222,6 @@ impl From<PyRunArgs> for RunArgs {
     fn from(py_run_args: PyRunArgs) -> Self {
         RunArgs {
             bounded_log_lookup: py_run_args.bounded_log_lookup,
-            tolerance: Tolerance::from(py_run_args.tolerance),
             input_scale: py_run_args.input_scale,
             param_scale: py_run_args.param_scale,
             num_inner_cols: py_run_args.num_inner_cols,
@@ -250,7 +246,6 @@ impl Into<PyRunArgs> for RunArgs {
     fn into(self) -> PyRunArgs {
         PyRunArgs {
             bounded_log_lookup: self.bounded_log_lookup,
-            tolerance: self.tolerance.val,
             input_scale: self.input_scale,
             param_scale: self.param_scale,
             num_inner_cols: self.num_inner_cols,
@@ -337,6 +332,8 @@ enum PyInputType {
     Int,
     ///
     TDim,
+    ///
+    Unknown,
 }
 
 impl From<InputType> for PyInputType {
@@ -348,6 +345,7 @@ impl From<InputType> for PyInputType {
             InputType::F64 => PyInputType::F64,
             InputType::Int => PyInputType::Int,
             InputType::TDim => PyInputType::TDim,
+            InputType::Unknown => PyInputType::Unknown,
         }
     }
 }
@@ -361,6 +359,7 @@ impl From<PyInputType> for InputType {
             PyInputType::F64 => InputType::F64,
             PyInputType::Int => InputType::Int,
             PyInputType::TDim => InputType::TDim,
+            PyInputType::Unknown => InputType::Unknown,
         }
     }
 }
@@ -375,6 +374,7 @@ impl FromStr for PyInputType {
             "f64" => Ok(PyInputType::F64),
             "int" => Ok(PyInputType::Int),
             "tdim" => Ok(PyInputType::TDim),
+            "unknown" => Ok(PyInputType::Unknown),
             _ => Err("Invalid value for InputType".to_string()),
         }
     }
@@ -592,7 +592,7 @@ fn poseidon_hash(message: Vec<PyFelt>) -> PyResult<Vec<PyFelt>> {
 /// Arguments
 /// -------
 /// message: list[str]
-///     List of field elements represnted as strings
+///     List of field elements represented as strings
 ///
 /// vk_path: str
 ///     Path to the verification key
@@ -651,7 +651,7 @@ fn kzg_commit(
 /// Arguments
 /// -------
 /// message: list[str]
-///     List of field elements represnted as strings
+///     List of field elements represented as strings
 ///
 /// vk_path: str
 ///     Path to the verification key
@@ -1009,7 +1009,7 @@ fn gen_random_data(
 /// bool
 ///
 #[pyfunction(signature = (
-    data = PathBuf::from(DEFAULT_CALIBRATION_FILE),
+    data = String::from(DEFAULT_CALIBRATION_FILE),
     model = PathBuf::from(DEFAULT_MODEL),
     settings = PathBuf::from(DEFAULT_SETTINGS),
     target = CalibrationTarget::default(), // default is "resources
@@ -1021,7 +1021,7 @@ fn gen_random_data(
 #[gen_stub_pyfunction]
 fn calibrate_settings(
     py: Python,
-    data: PathBuf,
+    data: String,
     model: PathBuf,
     settings: PathBuf,
     target: CalibrationTarget,
@@ -1076,7 +1076,7 @@ fn calibrate_settings(
 ///     Python object containing the witness values
 ///
 #[pyfunction(signature = (
-    data=PathBuf::from(DEFAULT_DATA),
+    data=String::from(DEFAULT_DATA),
     model=PathBuf::from(DEFAULT_COMPILED_CIRCUIT),
     output=PathBuf::from(DEFAULT_WITNESS),
     vk_path=None,
@@ -1085,7 +1085,7 @@ fn calibrate_settings(
 #[gen_stub_pyfunction]
 fn gen_witness(
     py: Python,
-    data: PathBuf,
+    data: String,
     model: PathBuf,
     output: Option<PathBuf>,
     vk_path: Option<PathBuf>,
@@ -1754,7 +1754,7 @@ fn create_evm_vka(
 /// bool
 ///
 #[pyfunction(signature = (
-    input_data=PathBuf::from(DEFAULT_DATA),
+    input_data=String::from(DEFAULT_DATA),
     settings_path=PathBuf::from(DEFAULT_SETTINGS),
     sol_code_path=PathBuf::from(DEFAULT_SOL_CODE_DA),
     abi_path=PathBuf::from(DEFAULT_VERIFIER_DA_ABI),
@@ -1763,7 +1763,7 @@ fn create_evm_vka(
 #[gen_stub_pyfunction]
 fn create_evm_data_attestation(
     py: Python,
-    input_data: PathBuf,
+    input_data: String,
     settings_path: PathBuf,
     sol_code_path: PathBuf,
     abi_path: PathBuf,
@@ -1819,12 +1819,12 @@ fn create_evm_data_attestation(
     test_data,
     input_source,
     output_source,
-    rpc_url=None,
+    rpc_url=None
 ))]
 #[gen_stub_pyfunction]
-fn setup_test_evm_witness(
+fn setup_test_evm_data(
     py: Python,
-    data_path: PathBuf,
+    data_path: String,
     compiled_circuit_path: PathBuf,
     test_data: PathBuf,
     input_source: PyTestDataSource,
@@ -1832,7 +1832,7 @@ fn setup_test_evm_witness(
     rpc_url: Option<String>,
 ) -> PyResult<Bound<'_, PyAny>> {
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
-        crate::execute::setup_test_evm_witness(
+        crate::execute::setup_test_evm_data(
             data_path,
             compiled_circuit_path,
             test_data,
@@ -1842,7 +1842,7 @@ fn setup_test_evm_witness(
         )
         .await
         .map_err(|e| {
-            let err_str = format!("Failed to run setup_test_evm_witness: {}", e);
+            let err_str = format!("Failed to run setup_test_evm_data: {}", e);
             PyRuntimeError::new_err(err_str)
         })?;
 
@@ -1902,7 +1902,7 @@ fn deploy_evm(
 fn deploy_da_evm(
     py: Python,
     addr_path: PathBuf,
-    input_data: PathBuf,
+    input_data: String,
     settings_path: PathBuf,
     sol_code_path: PathBuf,
     rpc_url: Option<String>,
@@ -1945,7 +1945,7 @@ fn deploy_da_evm(
 ///     does the verifier use data attestation ?
 ///
 /// addr_vk: str
-///     The addess of the separate VK contract (if the verifier key is rendered as a separate contract)
+///     The address of the separate VK contract (if the verifier key is rendered as a separate contract)
 /// Returns
 /// -------
 /// bool
@@ -2107,7 +2107,7 @@ fn ezkl(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(deploy_evm, m)?)?;
     m.add_function(wrap_pyfunction!(deploy_da_evm, m)?)?;
     m.add_function(wrap_pyfunction!(verify_evm, m)?)?;
-    m.add_function(wrap_pyfunction!(setup_test_evm_witness, m)?)?;
+    m.add_function(wrap_pyfunction!(setup_test_evm_data, m)?)?;
     m.add_function(wrap_pyfunction!(create_evm_verifier_aggr, m)?)?;
     m.add_function(wrap_pyfunction!(create_evm_data_attestation, m)?)?;
     m.add_function(wrap_pyfunction!(encode_evm_calldata, m)?)?;

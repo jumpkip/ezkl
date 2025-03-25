@@ -4,6 +4,7 @@ use crate::{
         utils::{self, F32},
     },
     tensor::{self, Tensor, TensorError},
+    tensor::{DataFormat, KernelFormat},
 };
 
 use super::{base::BaseOp, *};
@@ -43,10 +44,12 @@ pub enum PolyOp {
         padding: Vec<(usize, usize)>,
         stride: Vec<usize>,
         group: usize,
+        data_format: DataFormat,
+        kernel_format: KernelFormat,
     },
     Downsample {
         axis: usize,
-        stride: usize,
+        stride: isize,
         modulo: usize,
     },
     DeConv {
@@ -54,6 +57,8 @@ pub enum PolyOp {
         output_padding: Vec<usize>,
         stride: Vec<usize>,
         group: usize,
+        data_format: DataFormat,
+        kernel_format: KernelFormat,
     },
     Add,
     Sub,
@@ -103,13 +108,8 @@ pub enum PolyOp {
 }
 
 impl<
-        F: PrimeField
-            + TensorType
-            + PartialOrd
-            + std::hash::Hash
-            + Serialize
-            + for<'de> Deserialize<'de>,
-    > Op<F> for PolyOp
+    F: PrimeField + TensorType + PartialOrd + std::hash::Hash + Serialize + for<'de> Deserialize<'de>,
+> Op<F> for PolyOp
 {
     /// Returns a reference to the Any trait.
     fn as_any(&self) -> &dyn Any {
@@ -165,10 +165,12 @@ impl<
                 stride,
                 padding,
                 group,
+                data_format,
+                kernel_format,
             } => {
                 format!(
-                    "CONV (stride={:?}, padding={:?}, group={})",
-                    stride, padding, group
+                    "CONV (stride={:?}, padding={:?}, group={}, data_format={:?}, kernel_format={:?})",
+                    stride, padding, group, data_format, kernel_format
                 )
             }
             PolyOp::DeConv {
@@ -176,10 +178,12 @@ impl<
                 padding,
                 output_padding,
                 group,
+                data_format,
+                kernel_format,
             } => {
                 format!(
-                    "DECONV (stride={:?}, padding={:?}, output_padding={:?}, group={})",
-                    stride, padding, output_padding, group
+                    "DECONV (stride={:?}, padding={:?}, output_padding={:?}, group={}, data_format={:?}, kernel_format={:?})",
+                    stride, padding, output_padding, group, data_format, kernel_format
                 )
             }
             PolyOp::Concat { axis } => format!("CONCAT (axis={})", axis),
@@ -242,6 +246,8 @@ impl<
                 padding,
                 stride,
                 group,
+                data_format,
+                kernel_format,
             } => layouts::conv(
                 config,
                 region,
@@ -249,6 +255,8 @@ impl<
                 padding,
                 stride,
                 *group,
+                *data_format,
+                *kernel_format,
             )?,
             PolyOp::GatherElements { dim, constant_idx } => {
                 if let Some(idx) = constant_idx {
@@ -309,6 +317,8 @@ impl<
                 output_padding,
                 stride,
                 group,
+                data_format,
+                kernel_format,
             } => layouts::deconv(
                 config,
                 region,
@@ -317,6 +327,8 @@ impl<
                 output_padding,
                 stride,
                 *group,
+                *data_format,
+                *kernel_format,
             )?,
             PolyOp::Add => layouts::pairwise(config, region, values[..].try_into()?, BaseOp::Add)?,
             PolyOp::Sub => layouts::pairwise(config, region, values[..].try_into()?, BaseOp::Sub)?,

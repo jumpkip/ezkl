@@ -1,6 +1,6 @@
 use alloy::primitives::Address as H160;
 use clap::{Command, Parser, Subcommand};
-use clap_complete::{generate, Generator, Shell};
+use clap_complete::{Generator, Shell, generate};
 #[cfg(feature = "python-bindings")]
 use pyo3::{conversion::FromPyObject, exceptions::PyValueError, prelude::*};
 use serde::{Deserialize, Serialize};
@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use tosubcommand::{ToFlags, ToSubcommand};
 
-use crate::{pfsys::ProofType, Commitments, RunArgs};
+use crate::{Commitments, RunArgs, pfsys::ProofType};
 
 use crate::circuit::CheckMode;
 use crate::graph::TestDataSource;
@@ -360,8 +360,13 @@ pub fn get_styles() -> clap::builder::Styles {
 }
 
 /// Print completions for the given generator
-pub fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
-    generate(gen, cmd, cmd.get_name().to_string(), &mut std::io::stdout());
+pub fn print_completions<G: Generator>(r#gen: G, cmd: &mut Command) {
+    generate(
+        r#gen,
+        cmd,
+        cmd.get_name().to_string(),
+        &mut std::io::stdout(),
+    );
 }
 
 #[allow(missing_docs)]
@@ -397,7 +402,7 @@ pub enum Commands {
     GenWitness {
         /// The path to the .json data file
         #[arg(short = 'D', long, default_value = DEFAULT_DATA, value_hint = clap::ValueHint::FilePath)]
-        data: Option<PathBuf>,
+        data: Option<String>,
         /// The path to the compiled model file (generated using the compile-circuit command)
         #[arg(short = 'M', long, default_value = DEFAULT_COMPILED_CIRCUIT, value_hint = clap::ValueHint::FilePath)]
         compiled_circuit: Option<PathBuf>,
@@ -443,7 +448,7 @@ pub enum Commands {
     CalibrateSettings {
         /// The path to the .json calibration data file.
         #[arg(short = 'D', long, default_value = DEFAULT_CALIBRATION_FILE, value_hint = clap::ValueHint::FilePath)]
-        data: Option<PathBuf>,
+        data: Option<String>,
         /// The path to the .onnx model file
         #[arg(short = 'M', long, default_value = DEFAULT_MODEL, value_hint = clap::ValueHint::FilePath)]
         model: Option<PathBuf>,
@@ -627,7 +632,7 @@ pub enum Commands {
     SetupTestEvmData {
         /// The path to the .json data file, which should include both the network input (possibly private) and the network output (public input to the proof)
         #[arg(short = 'D', long, value_hint = clap::ValueHint::FilePath)]
-        data: Option<PathBuf>,
+        data: Option<String>,
         /// The path to the compiled model file (generated using the compile-circuit command)
         #[arg(short = 'M', long, value_hint = clap::ValueHint::FilePath)]
         compiled_circuit: Option<PathBuf>,
@@ -645,19 +650,6 @@ pub enum Commands {
         /// where the output data come from
         #[arg(long, default_value = "on-chain", value_hint = clap::ValueHint::Other)]
         output_source: TestDataSource,
-    },
-    /// The Data Attestation Verifier contract stores the account calls to fetch data to feed into ezkl. This call data can be updated by an admin account. This tests that admin account is able to update this call data.
-    #[command(arg_required_else_help = true)]
-    TestUpdateAccountCalls {
-        /// The path to the verifier contract's address
-        #[arg(long, value_hint = clap::ValueHint::Other)]
-        addr: H160Flag,
-        /// The path to the .json data file.
-        #[arg(short = 'D', long, value_hint = clap::ValueHint::FilePath)]
-        data: Option<PathBuf>,
-        /// RPC URL for an Ethereum node, if None will use Anvil but WON'T persist state
-        #[arg(short = 'U', long, value_hint = clap::ValueHint::Url)]
-        rpc_url: Option<String>,
     },
     /// Swaps the positions in the transcript that correspond to commitments
     SwapProofCommitments {
@@ -736,7 +728,7 @@ pub enum Commands {
     },
     /// Creates an Evm verifier artifact for a single proof to be used by the reusable verifier
     #[command(name = "create-evm-vka")]
-    CreateEvmVKArtifact {
+    CreateEvmVka {
         /// The path to SRS, if None will use ~/.ezkl/srs/kzg{logrows}.srs
         #[arg(long, value_hint = clap::ValueHint::FilePath)]
         srs_path: Option<PathBuf>,
@@ -755,7 +747,7 @@ pub enum Commands {
     },
     /// Creates an Evm verifier that attests to on-chain inputs for a single proof
     #[command(name = "create-evm-da")]
-    CreateEvmDataAttestation {
+    CreateEvmDa {
         /// The path to load circuit settings .json file from (generated using the gen-settings command)
         #[arg(short = 'S', long, default_value = DEFAULT_SETTINGS, value_hint = clap::ValueHint::FilePath)]
         settings_path: Option<PathBuf>,
@@ -771,7 +763,7 @@ pub enum Commands {
         /// view functions that return the data that the network
         /// ingests as inputs.
         #[arg(short = 'D', long, default_value = DEFAULT_DATA, value_hint = clap::ValueHint::FilePath)]
-        data: Option<PathBuf>,
+        data: Option<String>,
         /// The path to the witness file. This is needed for proof swapping for kzg commitments.
         #[arg(short = 'W', long, default_value = DEFAULT_WITNESS, value_hint = clap::ValueHint::FilePath)]
         witness: Option<PathBuf>,
@@ -864,10 +856,10 @@ pub enum Commands {
     },
     /// Deploys an evm verifier that allows for data attestation
     #[command(name = "deploy-evm-da")]
-    DeployEvmDataAttestation {
+    DeployEvmDa {
         /// The path to the .json data file, which should include both the network input (possibly private) and the network output (public input to the proof)
         #[arg(short = 'D', long, default_value = DEFAULT_DATA, value_hint = clap::ValueHint::FilePath)]
-        data: Option<PathBuf>,
+        data: Option<String>,
         /// The path to load circuit settings .json file from (generated using the gen-settings command)
         #[arg(long, default_value = DEFAULT_SETTINGS, value_hint = clap::ValueHint::FilePath)]
         settings_path: Option<PathBuf>,

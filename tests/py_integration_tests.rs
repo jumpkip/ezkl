@@ -46,7 +46,28 @@ mod py_tests {
             assert!(status.success());
         });
         // set VOICE_DATA_DIR environment variable
-        std::env::set_var("VOICE_DATA_DIR", format!("{}", voice_data_dir));
+        unsafe {
+            std::env::set_var("VOICE_DATA_DIR", format!("{}", voice_data_dir));
+        }
+    }
+
+    fn download_catdog_data() {
+        let cat_and_dog_data_dir = shellexpand::tilde("~/data/catdog_data");
+
+        DOWNLOAD_VOICE_DATA.call_once(|| {
+            let status = Command::new("bash")
+                .args([
+                    "examples/notebooks/cat_and_dog_data.sh",
+                    &cat_and_dog_data_dir,
+                ])
+                .status()
+                .expect("failed to execute process");
+            assert!(status.success());
+        });
+        // set VOICE_DATA_DIR environment variable
+        unsafe {
+            std::env::set_var("CATDOG_DATA_DIR", format!("{}", cat_and_dog_data_dir));
+        }
     }
 
     fn setup_py_env() {
@@ -221,6 +242,20 @@ mod py_tests {
                 let path = test_dir.path().to_str().unwrap();
                 crate::py_tests::mv_test_(path, "voice_judge.ipynb");
                 run_notebook(path, "voice_judge.ipynb");
+                test_dir.close().unwrap();
+                anvil_child.kill().unwrap();
+            }
+
+
+            #[test]
+            fn cat_and_dog_notebook_() {
+                crate::py_tests::init_binary();
+                let mut anvil_child = crate::py_tests::start_anvil(false);
+                crate::py_tests::download_catdog_data();
+                let test_dir: TempDir = TempDir::new("cat_and_dog").unwrap();
+                let path = test_dir.path().to_str().unwrap();
+                crate::py_tests::mv_test_(path, "cat_and_dog.ipynb");
+                run_notebook(path, "cat_and_dog.ipynb");
                 test_dir.close().unwrap();
                 anvil_child.kill().unwrap();
             }
