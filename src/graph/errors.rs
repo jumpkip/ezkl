@@ -67,8 +67,11 @@ pub enum GraphError {
     #[error("invalid input types")]
     InvalidInputTypes,
     /// Missing results
-    #[error("missing results")]
-    MissingResults,
+    #[error("missing result for node {0}")]
+    MissingResults(usize),
+    /// Missing input
+    #[error("missing input {0}")]
+    MissingInputForNode(usize),
     /// Tensor error
     #[error("[tensor] {0}")]
     TensorError(#[from] crate::tensor::TensorError),
@@ -98,14 +101,13 @@ pub enum GraphError {
         feature = "ezkl",
         not(all(target_arch = "wasm32", target_os = "unknown"))
     ))]
-    #[error("[tokio postgres] {0}")]
-    TokioPostgresError(#[from] tokio_postgres::Error),
     /// Eth error
     #[cfg(all(
         feature = "ezkl",
         not(all(target_arch = "wasm32", target_os = "unknown"))
     ))]
     #[error("[eth] {0}")]
+    #[cfg(all(feature = "eth", not(target_arch = "wasm32")))]
     EthError(#[from] crate::eth::EthError),
     /// Json error
     #[error("[json] {0}")]
@@ -141,7 +143,9 @@ pub enum GraphError {
     #[error("range check {0} is too large")]
     RangeCheckTooLarge(usize),
     ///Cannot use on-chain data source as private data
-    #[error("cannot use on-chain data source as 1) output for on-chain test 2) as private data 3) as input when using wasm.")]
+    #[error(
+        "cannot use on-chain data source as 1) output for on-chain test 2) as private data 3) as input when using wasm."
+    )]
     OnChainDataSource,
     /// Missing data source
     #[error("missing data source")]

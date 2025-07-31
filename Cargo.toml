@@ -3,7 +3,7 @@ cargo-features = ["profile-rustflags"]
 [package]
 name = "ezkl"
 version = "0.0.0"
-edition = "2024"
+edition = "2021"
 default-run = "ezkl"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -35,7 +35,9 @@ halo2_wrong_ecc = { git = "https://github.com/zkonduit/halo2wrong", branch = "ac
 snark-verifier = { git = "https://github.com/zkonduit/snark-verifier", branch = "ac/chunked-mv-lookup", features = [
     "derive_serde",
 ] }
-halo2_solidity_verifier = { git = "https://github.com/alexander-camuto/halo2-solidity-verifier", optional = true }
+halo2_solidity_verifier = { git = "https://github.com/zkonduit/ezkl-verifier", branch = "main", optional = true, features = [
+    "evm",
+] }
 maybe-rayon = { version = "0.1.1", default-features = false }
 bincode = { version = "1.3.3", default-features = false }
 unzip-n = "0.1.2"
@@ -43,10 +45,12 @@ num = "0.4.1"
 tosubcommand = { git = "https://github.com/zkonduit/enum_to_subcommand", package = "tosubcommand", optional = true }
 semver = { version = "1.0.22", optional = true }
 
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-serde_json = { version = "1.0.97", features = ["float_roundtrip", "raw_value"] }
 
 # evm related deps
+serde_json = { version = "1.0.97", features = ["float_roundtrip", "raw_value"] }
+
 alloy = { git = "https://github.com/alloy-rs/alloy", version = "0.1.0", rev = "5fbf57bac99edef9d8475190109a7ea9fb7e5e83", features = [
     "provider-http",
     "signers",
@@ -56,6 +60,7 @@ alloy = { git = "https://github.com/alloy-rs/alloy", version = "0.1.0", rev = "5
     "node-bindings",
 
 ], optional = true }
+
 foundry-compilers = { version = "0.4.1", features = [
     "svm-solc",
 ], optional = true }
@@ -69,20 +74,18 @@ reqwest = { version = "0.12.4", default-features = false, features = [
     "stream",
 ], optional = true }
 openssl = { version = "0.10.55", features = ["vendored"], optional = true }
-tokio-postgres = { version = "0.7.10", optional = true }
-pg_bigdecimal = { version = "0.1.5", optional = true }
 lazy_static = { version = "1.4.0", optional = true }
 colored_json = { version = "3.0.1", default-features = false, optional = true }
 tokio = { version = "1.35.0", default-features = false, features = [
     "macros",
     "rt-multi-thread",
 ], optional = true }
-pyo3 = { version = "0.23.2", features = [
+pyo3 = { version = "0.24.2", features = [
     "extension-module",
     "abi3-py37",
     "macros",
 ], default-features = false, optional = true }
-pyo3-async-runtimes = { git = "https://github.com/PyO3/pyo3-async-runtimes", version = "0.23.0", features = [
+pyo3-async-runtimes = { git = "https://github.com/PyO3/pyo3-async-runtimes", version = "0.24.0", features = [
     "attributes",
     "tokio-runtime",
 ], default-features = false, optional = true }
@@ -90,9 +93,9 @@ pyo3-log = { version = "0.12.0", default-features = false, optional = true }
 tract-onnx = { git = "https://github.com/sonos/tract/", rev = "37132e0397d0a73e5bd3a8615d932dabe44f6736", default-features = false, optional = true }
 tabled = { version = "0.12.0", optional = true }
 objc = { version = "0.2.4", optional = true }
-mimalloc = { version = "0.1", optional = true }
 pyo3-stub-gen = { version = "0.6.0", optional = true }
-
+jemallocator = { version = "0.5", optional = true }
+mimalloc = { version = "0.1", optional = true }
 # universal bindings
 uniffi = { version = "=0.28.0", optional = true }
 getrandom = { version = "0.2.8", optional = true }
@@ -219,52 +222,55 @@ required-features = ["python-bindings"]
 [features]
 web = ["wasm-bindgen-rayon"]
 default = [
+    "eth-mv-lookup",
     "ezkl",
-    "mv-lookup",
     "precompute-coset",
     "no-banner",
     "parallel-poly-read",
+    "reusable-verifier",
 ]
 onnx = ["dep:tract-onnx"]
 python-bindings = ["pyo3", "pyo3-log", "pyo3-async-runtimes", "pyo3-stub-gen"]
-ios-bindings = ["mv-lookup", "precompute-coset", "parallel-poly-read", "uniffi"]
+universal-bindings = [
+    "uniffi",
+    "mv-lookup",
+    "precompute-coset",
+    "parallel-poly-read",
+    "solidity-verifier-mv-lookup",
+]
+logging = ["dep:colored", "dep:env_logger", "dep:chrono"]
+ios-bindings = ["universal-bindings"]
 ios-bindings-test = ["ios-bindings", "uniffi/bindgen-tests"]
 ezkl = [
     "onnx",
-    "dep:colored",
-    "dep:env_logger",
     "tabled/color",
     "serde_json/std",
     "colored_json",
-    "dep:alloy",
-    "dep:foundry-compilers",
     "dep:ethabi",
     "dep:indicatif",
     "dep:gag",
     "dep:reqwest",
-    "dep:tokio-postgres",
-    "dep:pg_bigdecimal",
     "dep:lazy_static",
     "dep:tokio",
     "dep:openssl",
-    "dep:mimalloc",
     "dep:chrono",
     "dep:sha256",
     "dep:clap_complete",
-    "dep:halo2_solidity_verifier",
     "dep:semver",
     "dep:clap",
     "dep:tosubcommand",
+    "logging",
 ]
+eth = ["dep:alloy", "dep:foundry-compilers", "dep:ethabi"]
+solidity-verifier = ["dep:halo2_solidity_verifier"]
+solidity-verifier-mv-lookup = ["halo2_solidity_verifier/mv-lookup"]
+eth-mv-lookup = ["solidity-verifier-mv-lookup", "mv-lookup", "eth"]
+eth-original-lookup = ["eth", "solidity-verifier"]
 parallel-poly-read = [
     "halo2_proofs/circuit-params",
     "halo2_proofs/parallel-poly-read",
 ]
-mv-lookup = [
-    "halo2_proofs/mv-lookup",
-    "snark-verifier/mv-lookup",
-    "halo2_solidity_verifier/mv-lookup",
-]
+mv-lookup = ["halo2_proofs/mv-lookup", "snark-verifier/mv-lookup"]
 asm = ["halo2curves/asm", "halo2_proofs/asm"]
 precompute-coset = ["halo2_proofs/precompute-coset"]
 det-prove = []
@@ -274,22 +280,20 @@ no-banner = []
 no-update = []
 macos-metal = ["halo2_proofs/macos"]
 ios-metal = ["halo2_proofs/ios"]
-
-[patch.'https://github.com/zkonduit/halo2']
-halo2_proofs = { git = "https://github.com/zkonduit/halo2#f441c920be45f8f05d2c06a173d82e8885a5ed4d", package = "halo2_proofs" }
-
-[patch.'https://github.com/zkonduit/halo2#0654e92bdf725fd44d849bfef3643870a8c7d50b']
-halo2_proofs = { git = "https://github.com/zkonduit/halo2#f441c920be45f8f05d2c06a173d82e8885a5ed4d", package = "halo2_proofs" }
+jemalloc = ["dep:jemallocator"]
+mimalloc = ["dep:mimalloc"]
+reusable-verifier = []
 
 
 [patch.crates-io]
 uniffi_testing = { git = "https://github.com/ElusAegis/uniffi-rs", branch = "feat/testing-feature-build-fix" }
 
 [profile.release]
+# debug = true
 rustflags = ["-C", "relocation-model=pic"]
 lto = "fat"
 codegen-units = 1
-#panic = "abort"
+# panic = "abort"
 
 
 [profile.test-runs]

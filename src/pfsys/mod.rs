@@ -8,6 +8,8 @@ pub mod srs;
 pub mod errors;
 
 pub use errors::PfsysError;
+use itertools::chain;
+use std::borrow::Borrow;
 
 use crate::circuit::CheckMode;
 use crate::graph::GraphWitness;
@@ -17,16 +19,16 @@ use crate::{Commitments, EZKL_BUF_CAPACITY, EZKL_KEY_FORMAT};
 use clap::ValueEnum;
 use halo2_proofs::circuit::Value;
 use halo2_proofs::plonk::{
-    Circuit, ProvingKey, VerifyingKey, create_proof, keygen_pk, keygen_vk_custom, verify_proof,
+    create_proof, keygen_pk, keygen_vk_custom, verify_proof, Circuit, ProvingKey, VerifyingKey,
 };
-use halo2_proofs::poly::VerificationStrategy;
 use halo2_proofs::poly::commitment::{CommitmentScheme, Params, ParamsProver, Prover, Verifier};
 use halo2_proofs::poly::ipa::commitment::IPACommitmentScheme;
 use halo2_proofs::poly::kzg::commitment::KZGCommitmentScheme;
+use halo2_proofs::poly::VerificationStrategy;
 use halo2_proofs::transcript::{EncodedChallenge, TranscriptReadBuffer, TranscriptWriterBuffer};
-use halo2curves::CurveAffine;
 use halo2curves::ff::{FromUniformBytes, PrimeField, WithSmallOrderMulGroup};
 use halo2curves::serde::SerdeObject;
+use halo2curves::{bn256, CurveAffine};
 use instant::Instant;
 use log::{debug, info, trace};
 #[cfg(not(feature = "det-prove"))]
@@ -61,6 +63,81 @@ fn serde_format_from_str(s: &str) -> halo2_proofs::SerdeFormat {
         "raw-bytes" => halo2_proofs::SerdeFormat::RawBytes,
         _ => panic!("invalid serde format"),
     }
+}
+
+/// Function signature of `verifyProof(bytes,uint256[])`.
+pub const FN_SIG_VERIFY_PROOF: [u8; 4] = [0x1e, 0x8e, 0x1e, 0x13];
+
+/// Function signature of `verifyProof(bytes,uint256[],bytes32[])`.
+pub const FN_SIG_VERIFY_PROOF_WITH_VKA: [u8; 4] = [0x34, 0x09, 0xfc, 0x9f];
+
+/// Function signature of verifyWithDataAttestation(address,bytes)
+pub const FN_SIG_VERIFY_WITH_DATA_ATTESTATION: [u8; 4] = [0x4c, 0x79, 0x85, 0xd0];
+
+/// Function signatore of registeredVkas(bytes32[]) 0xdc8b4094
+pub const FN_SIG_REGISTER_VKA: [u8; 4] = [0xdc, 0x8b, 0x40, 0x94];
+
+/// Encode proof into calldata to invoke `Halo2Verifier.verifyProof`.
+///
+/// For `vk_address`:
+/// - Pass `None` if verifying key is embedded in `Halo2Verifier`
+/// - Pass `Some(vka)` if verifying key is separated and already registered
+pub fn encode_calldata(vka: Option<&[[u8; 32]]>, proof: &[u8], instances: &[bn256::Fr]) -> Vec<u8> {
+    let (fn_sig, offset) = if vka.is_some() {
+        (FN_SIG_VERIFY_PROOF_WITH_VKA, 0x60)
+    } else {
+        (FN_SIG_VERIFY_PROOF, 0x40)
+    };
+    let num_instances = instances.len();
+    let (vka_offset, vka_data) = if let Some(vka) = vka {
+        (
+            to_be_bytes_32(offset + 0x40 + proof.len() + (num_instances * 0x20)).to_vec(),
+            vka.to_vec(),
+        )
+    } else {
+        (Vec::new(), Vec::new())
+    };
+    let num_vka_words = vka_data.len();
+    chain![
+        fn_sig,                                              // function signature
+        to_be_bytes_32(offset),                              // offset of proof
+        to_be_bytes_32(offset + 0x20 + proof.len()),         // offset of instances
+        vka_offset,                                          // offset of vka
+        to_be_bytes_32(proof.len()),                         // length of proof
+        proof.iter().cloned(),                               // proof
+        to_be_bytes_32(num_instances),                       // length of instances
+        instances.iter().map(fr_to_bytes32).flatten(),       // instances
+        to_be_bytes_32(num_vka_words),                       // vka length
+        vka_data.iter().flat_map(|arr| arr.iter().cloned())  // vka words
+    ]
+    .collect()
+}
+
+fn to_be_bytes_32(value: usize) -> [u8; 32] {
+    let mut bytes = [0u8; 32];
+    // Convert the usize to big-endian bytes in the last 8 bytes (or however many needed)
+    let value_bytes = value.to_be_bytes();
+    let start_idx = 32 - value_bytes.len();
+    bytes[start_idx..].copy_from_slice(&value_bytes);
+    bytes
+}
+
+fn fr_to_bytes32(fe: impl Borrow<bn256::Fr>) -> [u8; 32] {
+    fe_to_bytes32(fe)
+}
+
+fn fe_to_bytes32<F>(fe: impl Borrow<F>) -> [u8; 32]
+where
+    F: PrimeField<Repr = halo2_proofs::halo2curves::serde::Repr<32>>,
+{
+    let repr = fe.borrow().to_repr();
+    // Note: we're converting from little-endian representation to big-endian bytes
+    let mut bytes = [0u8; 32];
+    let inner = repr.inner();
+    for i in 0..32 {
+        bytes[31 - i] = inner[i];
+    }
+    bytes
 }
 
 #[allow(missing_docs)]
@@ -110,12 +187,17 @@ impl From<ProofType> for StrategyType {
 }
 
 #[cfg(feature = "python-bindings")]
-impl ToPyObject for ProofType {
-    fn to_object(&self, py: Python) -> PyObject {
-        match self {
-            ProofType::Single => "Single".to_object(py),
-            ProofType::ForAggr => "ForAggr".to_object(py),
-        }
+impl<'py> pyo3::IntoPyObject<'py> for ProofType {
+    type Target = pyo3::PyAny;
+    type Output = pyo3::Bound<'py, Self::Target>;
+    type Error = pyo3::PyErr;
+
+    fn into_pyobject(self, py: pyo3::Python<'py>) -> Result<Self::Output, Self::Error> {
+        let result = match self {
+            ProofType::Single => "Single",
+            ProofType::ForAggr => "ForAggr",
+        };
+        Ok(result.into_pyobject(py)?.into_any())
     }
 }
 
@@ -168,12 +250,17 @@ impl std::fmt::Display for StrategyType {
 }
 #[cfg(feature = "python-bindings")]
 /// Converts StrategyType into a PyObject (Required for StrategyType to be compatible with Python)
-impl pyo3::IntoPy<PyObject> for StrategyType {
-    fn into_py(self, py: Python) -> PyObject {
-        match self {
-            StrategyType::Single => "single".to_object(py),
-            StrategyType::Accum => "accum".to_object(py),
-        }
+impl<'py> pyo3::IntoPyObject<'py> for StrategyType {
+    type Target = pyo3::PyAny;
+    type Output = pyo3::Bound<'py, Self::Target>;
+    type Error = pyo3::PyErr;
+
+    fn into_pyobject(self, py: pyo3::Python<'py>) -> Result<Self::Output, Self::Error> {
+        let result = match self {
+            StrategyType::Single => "single",
+            StrategyType::Accum => "accum",
+        };
+        Ok(result.into_pyobject(py)?.into_any())
     }
 }
 #[cfg(feature = "python-bindings")]
@@ -227,15 +314,6 @@ impl ToFlags for TranscriptType {
     }
 }
 
-#[cfg(feature = "python-bindings")]
-impl ToPyObject for TranscriptType {
-    fn to_object(&self, py: Python) -> PyObject {
-        match self {
-            TranscriptType::Poseidon => "Poseidon".to_object(py),
-            TranscriptType::EVM => "EVM".to_object(py),
-        }
-    }
-}
 
 #[cfg(feature = "python-bindings")]
 ///
@@ -324,14 +402,18 @@ where
 }
 
 #[cfg(feature = "python-bindings")]
-use pyo3::{PyObject, Python, ToPyObject, types::PyDict};
+use pyo3::{types::PyDict, IntoPyObject, Python};
 #[cfg(feature = "python-bindings")]
-impl<F: PrimeField + SerdeObject + Serialize, C: CurveAffine + Serialize> ToPyObject for Snark<F, C>
+impl<'py, F: PrimeField + SerdeObject + Serialize, C: CurveAffine + Serialize> IntoPyObject<'py> for Snark<F, C>
 where
     C::Scalar: Serialize + DeserializeOwned,
     C::ScalarExt: Serialize + DeserializeOwned,
 {
-    fn to_object(&self, py: Python) -> PyObject {
+    type Target = pyo3::PyAny;
+    type Output = pyo3::Bound<'py, Self::Target>;
+    type Error = pyo3::PyErr;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
         let dict = PyDict::new(py);
         let field_elems: Vec<Vec<String>> = self
             .instances
@@ -341,16 +423,16 @@ where
         dict.set_item("instances", field_elems).unwrap();
         let hex_proof = hex::encode(&self.proof);
         dict.set_item("proof", format!("0x{}", hex_proof)).unwrap();
-        dict.set_item("transcript_type", self.transcript_type.to_object(py))
+        dict.set_item("transcript_type", self.transcript_type.into_pyobject(py)?)
             .unwrap();
-        dict.to_object(py)
+        Ok(dict.into_any())
     }
 }
 
 impl<
-    F: PrimeField + SerdeObject + Serialize + FromUniformBytes<64> + DeserializeOwned,
-    C: CurveAffine + Serialize + DeserializeOwned,
-> Snark<F, C>
+        F: PrimeField + SerdeObject + Serialize + FromUniformBytes<64> + DeserializeOwned,
+        C: CurveAffine + Serialize + DeserializeOwned,
+    > Snark<F, C>
 where
     C::Scalar: Serialize + DeserializeOwned,
     C::ScalarExt: Serialize + DeserializeOwned,

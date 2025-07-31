@@ -9,7 +9,7 @@ use itertools::Itertools;
 use log::debug;
 #[cfg(feature = "python-bindings")]
 use pyo3::{
-    exceptions::PyValueError, FromPyObject, IntoPy, PyObject, PyResult, Python, ToPyObject,
+    exceptions::PyValueError, FromPyObject, IntoPyObject, PyResult, Python,
 };
 use serde::{Deserialize, Serialize};
 #[cfg(all(feature = "ezkl", not(target_arch = "wasm32")))]
@@ -107,27 +107,31 @@ impl<'a> From<&'a str> for Visibility {
 }
 
 #[cfg(feature = "python-bindings")]
-impl IntoPy<PyObject> for Visibility {
+impl<'py> IntoPyObject<'py> for Visibility {
+    type Target = pyo3::PyAny;
+    type Output = pyo3::Bound<'py, Self::Target>;
+    type Error = pyo3::PyErr;
+
     /// Converts Visibility to Python object
-    fn into_py(self, py: Python) -> PyObject {
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
         match self {
-            Visibility::Private => "private".to_object(py),
-            Visibility::Public => "public".to_object(py),
-            Visibility::Fixed => "fixed".to_object(py),
-            Visibility::KZGCommit => "polycommit".to_object(py),
+            Visibility::Private => Ok("private".into_pyobject(py)?.into_any()),
+            Visibility::Public => Ok("public".into_pyobject(py)?.into_any()),
+            Visibility::Fixed => Ok("fixed".into_pyobject(py)?.into_any()),
+            Visibility::KZGCommit => Ok("polycommit".into_pyobject(py)?.into_any()),
             Visibility::Hashed {
                 hash_is_public,
                 outlets,
             } => {
                 if hash_is_public {
-                    "hashed/public".to_object(py)
+                    Ok("hashed/public".into_pyobject(py)?.into_any())
                 } else {
                     let outlets = outlets
                         .iter()
                         .map(|o| o.to_string())
                         .collect_vec()
                         .join(",");
-                    format!("hashed/private/{}", outlets).to_object(py)
+                    Ok(format!("hashed/private/{}", outlets).into_pyobject(py)?.into_any())
                 }
             }
         }
@@ -246,6 +250,8 @@ pub struct VarScales {
     pub params: crate::Scale,
     /// Multiplier for scale rebasing
     pub rebase_multiplier: u32,
+    /// rebase scale factor (optional). if None, we rebase to the max of input_scale and param_scale
+    pub rebase_scale: Option<crate::Scale>,
 }
 
 impl std::fmt::Display for VarScales {
@@ -265,11 +271,21 @@ impl VarScales {
         std::cmp::min(self.input, self.params)
     }
 
+    /// Returns the scale to rebase to, if specified
+    pub fn get_rebase_scale(&self) -> crate::Scale {
+        if let Some(rebase_scale) = self.rebase_scale {
+            rebase_scale
+        } else {
+            self.get_max()
+        }
+    }
+
     /// Creates VarScales from runtime arguments
     pub fn from_args(args: &RunArgs) -> Self {
         Self {
             input: args.input_scale,
             params: args.param_scale,
+            rebase_scale: args.rebase_scale,
             rebase_multiplier: args.scale_rebase_multiplier,
         }
     }

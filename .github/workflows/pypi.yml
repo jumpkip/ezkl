@@ -48,11 +48,12 @@ jobs:
           mv Cargo.lock Cargo.lock.orig
           sed "s/0\\.0\\.0/${RELEASE_TAG//v}/" Cargo.lock.orig >Cargo.lock
 
-      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+      - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
         with:
-          toolchain: nightly-2025-02-17
+          toolchain: nightly-2025-05-01
           override: true
           components: rustfmt, clippy
+          cache: false
 
       - name: Build wheels
         if: matrix.target == 'universal2-apple-darwin'
@@ -113,11 +114,12 @@ jobs:
           mv Cargo.lock Cargo.lock.orig
           sed "s/0\\.0\\.0/${RELEASE_TAG//v}/" Cargo.lock.orig >Cargo.lock
 
-      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+      - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
         with:
-          toolchain: nightly-2025-02-17
+          toolchain: nightly-2025-05-01
           override: true
           components: rustfmt, clippy
+          cache: false
 
       - name: Build wheels
         uses: PyO3/maturin-action@5f8a1b3b0aad13193f46c9131f9b9e663def8ce5  #v1.46.0
@@ -258,7 +260,7 @@ jobs:
 
       - name: Install built wheel
         if: matrix.target == 'x86_64-unknown-linux-musl'
-        uses: addnab/docker-run-action@v3
+        uses: addnab/docker-run-action@3e77f186b7a929ef010f183a9e24c0f9955ea609
         with:
           image: alpine:latest
           options: -v ${{ github.workspace }}:/io -w /io
@@ -380,7 +382,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Trigger RTDs build
-        uses: dfm/rtds-action@v1
+        uses: dfm/rtds-action@618148c547f4b56cdf4fa4dcf3a94c91ce025f2d
         with:
           webhook_url: ${{ secrets.RTDS_WEBHOOK_URL }}
           webhook_token: ${{ secrets.RTDS_WEBHOOK_TOKEN }}

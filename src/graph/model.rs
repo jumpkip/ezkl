@@ -12,6 +12,8 @@ use crate::circuit::Input;
 use crate::circuit::InputType;
 use crate::circuit::Unknown;
 use crate::fieldutils::IntegerRep;
+use crate::graph::DynamicLookupParams;
+use crate::graph::ShuffleParams;
 use crate::tensor::ValType;
 use crate::{
     circuit::{lookup::LookupOp, BaseConfig as PolyConfig, CheckMode, Op},
@@ -100,12 +102,10 @@ pub type NodeGraph = BTreeMap<usize, NodeType>;
 pub struct DummyPassRes {
     /// number of rows use
     pub num_rows: usize,
-    /// num dynamic lookups
-    pub num_dynamic_lookups: usize,
-    /// max dynamic lookup input len
-    pub max_dynamic_input_len: usize,
-    /// dynamic lookup col size
-    pub dynamic_lookup_col_coord: usize,
+    /// dynamic lookup parameters
+    pub dynamic_lookup_params: DynamicLookupParams,
+    /// shuffle parameters
+    pub shuffle_params: ShuffleParams,
     /// num shuffles
     pub num_shuffles: usize,
     /// shuffle
@@ -200,7 +200,7 @@ fn number_of_iterations(mappings: &[InputMapping], dims: Vec<&[usize]>) -> usize
                 InputMapping::Stacked { axis, chunk } => Some(
                     // number of iterations given the dim size along the axis
                     // and the chunk size
-                    (dims[*axis] + chunk - 1) / chunk,
+                    dims[*axis].div_ceil(*chunk), // (dims[*axis] + chunk - 1) / chunk,
                 ),
                 _ => None,
             });
@@ -585,19 +585,13 @@ impl Model {
             num_rows: res.num_rows,
             total_assignments: res.linear_coord,
             required_lookups: res.lookup_ops.into_iter().collect(),
-            max_dynamic_input_len: res.max_dynamic_input_len,
             required_range_checks: res.range_checks.into_iter().collect(),
             model_output_scales: self.graph.get_output_scales()?,
             model_input_scales: self.graph.get_input_scales(),
-            input_types: match self.get_input_types() {
-                Ok(x) => Some(x),
-                Err(_) => None,
-            },
+            input_types: self.get_input_types().ok(),
             output_types: Some(self.get_output_types()),
-            num_dynamic_lookups: res.num_dynamic_lookups,
-            total_dynamic_col_size: res.dynamic_lookup_col_coord,
-            num_shuffles: res.num_shuffles,
-            total_shuffle_col_size: res.shuffle_col_coord,
+            dynamic_lookup_params: res.dynamic_lookup_params,
+            shuffle_params: res.shuffle_params,
             total_const_size: res.total_const_size,
             check_mode,
             version: env!("CARGO_PKG_VERSION").to_string(),
@@ -650,10 +644,13 @@ impl Model {
         let variables: std::collections::HashMap<String, usize> =
             std::collections::HashMap::from_iter(variables.iter().map(|(k, v)| (k.clone(), *v)));
 
-        for (i, id) in model.clone().inputs.iter().enumerate() {
+        let inputs = model.inputs.clone();
+        let outputs = model.outputs.clone();
+
+        for (i, id) in inputs.iter().enumerate() {
             let input = model.node_mut(id.node);
 
-            if input.outputs.len() == 0 {
+            if input.outputs.is_empty() {
                 return Err(GraphError::MissingOutput(id.node));
             }
             let mut fact: InferenceFact = input.outputs[0].fact.clone();
@@ -672,7 +669,7 @@ impl Model {
             model.set_input_fact(i, fact)?;
         }
 
-        for (i, _) in model.clone().outputs.iter().enumerate() {
+        for (i, _) in outputs.iter().enumerate() {
             model.set_output_fact(i, InferenceFact::default())?;
         }
 
@@ -1196,7 +1193,7 @@ impl Model {
                                 .base
                                 .layout(
                                     &mut thread_safe_region,
-                                    &[output.clone(), comparators],
+                                    &[output, &comparators],
                                     Box::new(HybridOp::Output {
                                         decomp: !run_args.ignore_range_check_inputs_outputs,
                                     }),
@@ -1257,12 +1254,27 @@ impl Model {
                 node.inputs()
                     .iter()
                     .map(|(idx, outlet)| {
-                        Ok(results.get(idx).ok_or(GraphError::MissingResults)?[*outlet].clone())
+                        // check node is not an output
+                        let is_output = self.graph.outputs.iter().any(|(o_idx, _)| *idx == *o_idx);
+
+                        let res = if self.graph.nodes[idx].num_uses() == 1 && !is_output {
+                            let res = results.remove(idx);
+                            res.ok_or(GraphError::MissingResults(*idx))?[*outlet].clone()
+                        } else {
+                            results.get(idx).ok_or(GraphError::MissingResults(*idx))?[*outlet]
+                                .clone()
+                        };
+                        Ok(res)
                     })
                     .collect::<Result<Vec<_>, GraphError>>()?
             } else {
                 // we re-assign inputs, always from the 0 outlet
-                vec![results.get(idx).ok_or(GraphError::MissingResults)?[0].clone()]
+                if self.graph.nodes[idx].num_uses() == 1 {
+                    let res = results.remove(idx);
+                    vec![res.ok_or(GraphError::MissingInput(*idx))?[0].clone()]
+                } else {
+                    vec![results.get(idx).ok_or(GraphError::MissingInput(*idx))?[0].clone()]
+                }
             };
             trace!("output dims: {:?}", node.out_dims());
             trace!(
@@ -1273,7 +1285,7 @@ impl Model {
             let start = instant::Instant::now();
             match &node {
                 NodeType::Node(n) => {
-                    let res = if node.is_constant() && node.num_uses() == 1 {
+                    let mut res = if node.is_constant() && node.num_uses() == 1 {
                         log::debug!("node {} is a constant with 1 use", n.idx);
                         let mut node = n.clone();
                         let c = node
@@ -1284,19 +1296,19 @@ impl Model {
                     } else {
                         config
                             .base
-                            .layout(region, &values, n.opkind.clone_dyn())
+                            .layout(region, &values.iter().collect_vec(), n.opkind.clone_dyn())
                             .map_err(|e| {
                                 error!("{}", e);
                                 halo2_proofs::plonk::Error::Synthesis
                             })?
                     };
 
-                    if let Some(mut vt) = res {
+                    if let Some(vt) = &mut res {
                         vt.reshape(&node.out_dims()[0])?;
-                        // we get the max as for fused nodes this corresponds to the node output
-                        results.insert(*idx, vec![vt.clone()]);
                         //only use with mock prover
                         debug!("------------ output node {:?}: {:?}", idx, vt.show());
+                        // we get the max as for fused nodes this corresponds to the node output
+                        results.insert(*idx, vec![vt.clone()]);
                     }
                 }
                 NodeType::SubGraph {
@@ -1340,7 +1352,7 @@ impl Model {
                                 .inputs
                                 .clone()
                                 .into_iter()
-                                .zip(values.clone().into_iter().map(|v| vec![v])),
+                                .zip(values.iter().map(|v| vec![v.clone()])),
                         );
 
                         let res = model.layout_nodes(config, region, &mut subgraph_results)?;
@@ -1421,7 +1433,7 @@ impl Model {
         );
         let outputs = output_nodes
             .map(|(idx, outlet)| {
-                Ok(results.get(idx).ok_or(GraphError::MissingResults)?[*outlet].clone())
+                Ok(results.get(idx).ok_or(GraphError::MissingResults(*idx))?[*outlet].clone())
             })
             .collect::<Result<Vec<_>, GraphError>>()?;
 
@@ -1476,7 +1488,7 @@ impl Model {
 
                     dummy_config.layout(
                         &mut region,
-                        &[output.clone(), comparator],
+                        &[output, &comparator],
                         Box::new(HybridOp::Output {
                             decomp: !run_args.ignore_range_check_inputs_outputs,
                         }),
@@ -1508,15 +1520,21 @@ impl Model {
         let res = DummyPassRes {
             num_rows: region.row(),
             linear_coord: region.linear_coord(),
-            max_dynamic_input_len: region.max_dynamic_input_len(),
+            dynamic_lookup_params: DynamicLookupParams {
+                total_dynamic_col_size: region.dynamic_lookup_col_coord(),
+                max_dynamic_input_len: region.max_dynamic_input_len(),
+                num_dynamic_lookups: region.dynamic_lookup_index(),
+            },
+            shuffle_params: ShuffleParams {
+                num_shuffles: region.shuffle_index(),
+                total_shuffle_col_size: region.shuffle_col_coord(),
+            },
             total_const_size: region.total_constants(),
             lookup_ops: region.used_lookups(),
             range_checks: region.used_range_checks(),
             max_lookup_inputs: region.max_lookup_inputs(),
             min_lookup_inputs: region.min_lookup_inputs(),
             max_range_size: region.max_range_size(),
-            num_dynamic_lookups: region.dynamic_lookup_index(),
-            dynamic_lookup_col_coord: region.dynamic_lookup_col_coord(),
             num_shuffles: region.shuffle_index(),
             shuffle_col_coord: region.shuffle_col_coord(),
             outputs,

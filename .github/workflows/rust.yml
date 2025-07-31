@@ -24,16 +24,19 @@ jobs:
     permissions:
       contents: read
     runs-on: large-self-hosted
+    env:
+      EVM_VERIFIER_EZKL_TOKEN: ${{ secrets.EVM_VERIFIER_EZKL_TOKEN }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
         with:
           persist-credentials: false
-      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+
+      - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
         with:
-          toolchain: nightly-2025-02-17
+          toolchain: nightly-2025-05-01
           override: true
           components: rustfmt, clippy
-      - uses: baptiste0928/cargo-install@v1
+      - uses: baptiste0928/cargo-install@91c5da15570085bcde6f4d7aed98cb82d6769fd3
         with:
           crate: cargo-nextest
           locked: true
@@ -44,13 +47,17 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-latest
+    env:
+      EVM_VERIFIER_EZKL_TOKEN: ${{ secrets.EVM_VERIFIER_EZKL_TOKEN }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
         with:
           persist-credentials: false
-      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+
+
+      - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
         with:
-          toolchain: nightly-2025-02-17
+          toolchain: nightly-2025-05-01
           override: true
           components: rustfmt, clippy
       - name: Build
@@ -60,13 +67,15 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-latest
+    env:
+      EVM_VERIFIER_EZKL_TOKEN: ${{ secrets.EVM_VERIFIER_EZKL_TOKEN }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
         with:
           persist-credentials: false
-      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+      - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
         with:
-          toolchain: nightly-2025-02-17
+          toolchain: nightly-2025-05-01
           override: true
           components: rustfmt, clippy
       - name: Docs
@@ -76,13 +85,15 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-latest-32-cores
+    env:
+      EVM_VERIFIER_EZKL_TOKEN: ${{ secrets.EVM_VERIFIER_EZKL_TOKEN }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
         with:
           persist-credentials: false
-      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+      - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
         with:
-          toolchain: nightly-2025-02-17
+          toolchain: nightly-2025-05-01
           override: true
           components: rustfmt, clippy
       - uses: baptiste0928/cargo-install@91c5da15570085bcde6f4d7aed98cb82d6769fd3  #v3.3.0
@@ -95,7 +106,7 @@ jobs:
       - name: Library tests
         run: cargo nextest run --lib --verbose
       - name: Library tests (original lookup)
-        run: cargo nextest run --lib --verbose --no-default-features --features ezkl
+        run: cargo nextest run --lib --verbose --no-default-features --features ezkl,eth-original-lookup
 
   # ultra-overflow-tests-gpu:
   #   runs-on: GPU
@@ -105,9 +116,9 @@ jobs:
   #     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
   # with:
   #   persist-credentials: false
-  #     - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+  #     - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
   #       with:
-  #         toolchain: nightly-2025-02-17
+  #         toolchain: nightly-2025-05-01
   #         override: true
   #         components: rustfmt, clippy
   #     - uses: baptiste0928/cargo-install@91c5da15570085bcde6f4d7aed98cb82d6769fd3  #v3.3.0
@@ -133,14 +144,17 @@ jobs:
   ultra-overflow-tests_og-lookup:
     permissions:
       contents: read
-    runs-on: non-gpu
+    runs-on: [ non-gpu, non-sgx ]
+    env:
+      EVM_VERIFIER_EZKL_TOKEN: ${{ secrets.EVM_VERIFIER_EZKL_TOKEN }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
         with:
           persist-credentials: false
-      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+
+      - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
         with:
-          toolchain: nightly-2025-02-17
+          toolchain: nightly-2025-05-01
           override: true
           components: rustfmt, clippy
       - uses: baptiste0928/cargo-install@91c5da15570085bcde6f4d7aed98cb82d6769fd3  #v3.3.0
@@ -155,27 +169,33 @@ jobs:
       # - name: Conv overflow (wasi)
       #   run: cargo wasi test conv_col_ultra_overflow -- --include-ignored --nocapture
       - name: lookup overflow
-        run: cargo nextest run --release lookup_ultra_overflow --no-capture --no-default-features --features ezkl -- --include-ignored
+        run: cargo nextest run --release lookup_ultra_overflow --no-capture --no-default-features --features ezkl,eth-original-lookup -- --include-ignored
       - name: Matmul overflow
-        run: RUST_LOG=debug cargo nextest run --release matmul_col_ultra_overflow --no-capture --no-default-features --features ezkl -- --include-ignored
+        run: RUST_LOG=debug cargo nextest run --release matmul_col_ultra_overflow --no-capture --no-default-features --features ezkl,eth-original-lookup -- --include-ignored
       - name: Conv overflow
-        run: RUST_LOG=debug cargo nextest run --release conv_col_ultra_overflow --no-capture --no-default-features --features ezkl -- --include-ignored
+        run: RUST_LOG=debug cargo nextest run --release conv_col_ultra_overflow --no-capture --no-default-features --features ezkl,eth-original-lookup -- --include-ignored
       - name: Conv + relu overflow
-        run: cargo nextest run --release conv_relu_col_ultra_overflow --no-capture --no-default-features --features ezkl -- --include-ignored
+        run: cargo nextest run --release conv_relu_col_ultra_overflow --no-capture --no-default-features --features ezkl,eth-original-lookup -- --include-ignored
 
   ultra-overflow-tests:
     permissions:
       contents: read
-    runs-on: non-gpu
+    runs-on: [ non-gpu, non-sgx ]
+    env:
+      EVM_VERIFIER_EZKL_TOKEN: ${{ secrets.EVM_VERIFIER_EZKL_TOKEN }}
+
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
         with:
           persist-credentials: false
-      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+
+
+      - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
         with:
-          toolchain: nightly-2025-02-17
+          toolchain: nightly-2025-05-01
           override: true
           components: rustfmt, clippy
+
       - uses: baptiste0928/cargo-install@91c5da15570085bcde6f4d7aed98cb82d6769fd3  #v3.3.0
         with:
           crate: cargo-nextest
@@ -200,13 +220,18 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-latest-16-cores
+    env:
+      EVM_VERIFIER_EZKL_TOKEN: ${{ secrets.EVM_VERIFIER_EZKL_TOKEN }}
+
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
         with:
           persist-credentials: false
-      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+
+
+      - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
         with:
-          toolchain: nightly-2025-02-17
+          toolchain: nightly-2025-05-01
           override: true
           components: rustfmt, clippy
       - uses: baptiste0928/cargo-install@91c5da15570085bcde6f4d7aed98cb82d6769fd3  #v3.3.0
@@ -219,62 +244,60 @@ jobs:
   wasm32-tests:
     permissions:
       contents: read
-    runs-on: non-gpu
+    runs-on: ubuntu-latest-64-cores
+    env:
+      EVM_VERIFIER_EZKL_TOKEN: ${{ secrets.EVM_VERIFIER_EZKL_TOKEN }}
+      # add `atomics` and `bulk-memory` to RUSTFLAGS to enable wasm-bindgen tests
+      RUSTFLAGS: "-C target-feature=+atomics,+bulk-memory"
+
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
         with:
           persist-credentials: false
-      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+
+
+      - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
         with:
-          toolchain: nightly-2025-02-17
+          toolchain: nightly-2025-05-01
           override: true
           components: rustfmt, clippy
       - uses: jetli/wasm-pack-action@0d096b08b4e5a7de8c28de67e11e945404e9eefa  #v0.4.0
         with:
           # Pin to version 0.12.1
           version: "v0.12.1"
-      - uses: nanasess/setup-chromedriver@e93e57b843c0c92788f22483f1a31af8ee48db25  #v2.3.0
+      - uses: nanasess/setup-chromedriver@affb1ea8848cbb080be372c1e8d7a5c173e9298f  #v2.3.0
         # with:
         #   chromedriver-version: "115.0.5790.102"
       - name: Install wasm32-unknown-unknown
         run: rustup target add wasm32-unknown-unknown
       - name: Add rust-src
-        run: rustup component add rust-src --toolchain nightly-2025-02-17-x86_64-unknown-linux-gnu
+        run: rustup component add rust-src --toolchain nightly-2025-05-01-x86_64-unknown-linux-gnu
+      - name: Create webdriver.json to disable timeouts
+        run: |
+          echo '{"args": ["--headless", "--disable-gpu", "--disable-dev-shm-usage", "--no-sandbox"]}' > webdriver.json
       - name: Run wasm verifier tests
-        # on mac:
-        #   AR=/opt/homebrew/opt/llvm/bin/llvm-ar CC=/opt/homebrew/opt/llvm/bin/clang wasm-pack test --firefox --headless -- -Z build-std="panic_abort,std" --features web
-        run: wasm-pack test --chrome --headless -- -Z build-std="panic_abort,std" --features web
-
-  foudry-solidity-tests:
-    permissions:
-      contents: read
-    runs-on: non-gpu
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          persist-credentials: false
-          submodules: recursive
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-
-      - name: Run tests
-        run: | 
-          cd tests/foundry
-          forge install https://github.com/foundry-rs/forge-std --no-git --no-commit
-          forge test -vvvv --fuzz-runs 64
+        run: |
+          ulimit -n 65536
+          WASM_BINDGEN_TEST_THREADS=1 \
+          WASM_BINDGEN_TEST_TIMEOUT=1800 \
+          CHROMEDRIVER_ARGS="--log-level=INFO" \
+          wasm-pack test --chrome --headless -- -Z build-std="panic_abort,std" --features web -- --nocapture
 
   mock-proving-tests:
     permissions:
       contents: read
-    runs-on: non-gpu
+    runs-on: [ non-gpu, non-sgx ]
+    env:
+      EVM_VERIFIER_EZKL_TOKEN: ${{ secrets.EVM_VERIFIER_EZKL_TOKEN }}
+
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
         with:
           persist-credentials: false
-      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+
+      - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
         with:
-          toolchain: nightly-2025-02-17
+          toolchain: nightly-2025-05-01
           override: true
           components: rustfmt, clippy
       - uses: baptiste0928/cargo-install@91c5da15570085bcde6f4d7aed98cb82d6769fd3  #v3.3.0
@@ -333,17 +356,27 @@ jobs:
   prove-and-verify-evm-tests:
     permissions:
       contents: read
-    runs-on: non-gpu
-    needs: [build, library-tests, docs, python-tests, python-integration-tests]
+    runs-on: [ non-gpu, non-sgx ]
+    # needs: [build, library-tests, docs, python-tests, python-integration-tests]
+    env:
+      EVM_VERIFIER_EZKL_TOKEN: ${{ secrets.EVM_VERIFIER_EZKL_TOKEN }}
+      RUSTFLAGS: "-C target-feature=+atomics,+bulk-memory"
+
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
         with:
           persist-credentials: false
-      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+
+
+      - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
         with:
-          toolchain: nightly-2025-02-17
+          toolchain: nightly-2025-05-01
           override: true
           components: rustfmt, clippy
+      - uses: jetli/wasm-pack-action@0d096b08b4e5a7de8c28de67e11e945404e9eefa  #v0.4.0
+        with:
+          # Pin to version 0.12.1
+          version: "v0.12.1"
       - uses: baptiste0928/cargo-install@91c5da15570085bcde6f4d7aed98cb82d6769fd3  #v3.3.0
         with:
           crate: cargo-nextest
@@ -361,53 +394,27 @@ jobs:
           node-version: "18.12.1"
           cache: "pnpm"
       - name: "Add rust-src"
-        run: rustup component add rust-src --toolchain nightly-2025-02-17-x86_64-unknown-linux-gnu
-      - name: Install dependencies for js tests and in-browser-evm-verifier package
+        run: rustup component add rust-src --toolchain nightly-2025-05-01-x86_64-unknown-linux-gnu
+      - name: Install dependencies for js tests and package
         run: |
           pnpm install --frozen-lockfile
-          pnpm install --dir ./in-browser-evm-verifier --frozen-lockfile
-        env:
-          CI: false
-          NODE_ENV: development
-      - name: Build wasm package for nodejs target.
-        run: |
-          wasm-pack build --target nodejs --out-dir ./in-browser-evm-verifier/nodejs . -- -Z build-std="panic_abort,std"
-      - name: Replace memory definition in nodejs
-        run: |
-          sed -i "3s|.*|imports['env'] = {memory: new WebAssembly.Memory({initial:20,maximum:65536,shared:true})}|" in-browser-evm-verifier/nodejs/ezkl.js
-      - name: Build @ezkljs/verify package
-        run: |
-          cd in-browser-evm-verifier
-          pnpm build:commonjs
-          cd ..
       # - name: Install solc
       #   run: (hash svm 2>/dev/null || cargo install svm-rs) && svm install 0.8.20 && solc --version
       - name: Install Anvil
-        run: cargo install --git https://github.com/foundry-rs/foundry --rev 62cdea8ff9e6efef011f77e295823b5f2dbeb3a1 --locked anvil --force
+        run: cargo install --git https://github.com/foundry-rs/foundry --rev 56b806a3ba7866a3b061093bebd0fa2ace97f1fc --locked anvil --force
+      - name: Build wasm package for nodejs target.
+        run: |
+          wasm-pack build --target nodejs --out-dir ./tests/wasm/nodejs . -- -Z build-std="panic_abort,std"
+      - name: KZG prove and verify tests (EVM)
+        run: cargo nextest run --verbose "tests_evm::kzg_evm_prove_and_verify_::" --test-threads 1
       - name: KZG prove and verify tests (EVM + reusable verifier + col-overflow)
-        run: cargo nextest run --verbose tests_evm::kzg_evm_prove_and_verify_reusable_verifier --test-threads 1
+        run: cargo nextest run --verbose tests_evm::kzg_evm_prove_and_verify_reusable_verifier --features reusable-verifier --test-threads 1
       - name: KZG prove and verify tests (EVM + kzg all)
         run: cargo nextest run --verbose tests_evm::kzg_evm_kzg_all_prove_and_verify --test-threads 1
       - name: KZG prove and verify tests (EVM + kzg inputs)
         run: cargo nextest run --verbose tests_evm::kzg_evm_kzg_input_prove_and_verify --test-threads 1
       - name: KZG prove and verify tests (EVM + kzg params)
         run: cargo nextest run --verbose tests_evm::kzg_evm_kzg_params_prove_and_verify --test-threads 1
-      - name: KZG prove and verify tests (EVM + on chain inputs)
-        run: cargo nextest run --verbose tests_evm::kzg_evm_on_chain_input_prove_and_verify --test-threads 1
-      - name: KZG prove and verify tests (EVM + on chain outputs)
-        run: cargo nextest run --verbose tests_evm::kzg_evm_on_chain_output_prove_and_verify --test-threads 1
-      - name: KZG prove and verify tests (EVM + on chain inputs & outputs)
-        run: cargo nextest run --verbose tests_evm::kzg_evm_on_chain_input_output_prove_and_verify --test-threads 1
-      - name: KZG prove and verify tests (EVM + on chain inputs & kzg outputs + params)
-        run: cargo nextest run --verbose tests_evm::kzg_evm_on_chain_input_kzg_output_kzg_params_prove_and_verify --test-threads 1
-      - name: KZG prove and verify tests (EVM + on chain outputs & kzg inputs + params)
-        run: cargo nextest run --verbose tests_evm::kzg_evm_on_chain_output_kzg_input_kzg_params_prove_and_verify --test-threads 1
-      - name: KZG prove and verify tests (EVM + on chain all kzg)
-        run: cargo nextest run --verbose tests_evm::kzg_evm_on_chain_all_kzg_params_prove_and_verify --test-threads 1
-      - name: KZG prove and verify tests (EVM + on chain inputs & outputs hashes)
-        run: cargo nextest run --verbose tests_evm::kzg_evm_on_chain_input_output_hashed_prove_and_verify --test-threads 1
-      - name: KZG prove and verify tests (EVM)
-        run: cargo nextest run --verbose tests_evm::kzg_evm_prove_and_verify --test-threads 1
       - name: KZG prove and verify tests (EVM + hashed inputs)
         run: cargo nextest run --verbose tests_evm::kzg_evm_hashed_input_prove_and_verify --test-threads 1
       - name: KZG prove and verify tests (EVM + hashed params)
@@ -424,9 +431,9 @@ jobs:
   #     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
   #       with:
   #         persist-credentials: false
-  #     - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+  #     - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
   #       with:
-  #         toolchain: nightly-2025-02-17
+  #         toolchain: nightly-2025-05-01
   #         override: true
   #         components: rustfmt, clippy
   #     - uses: jetli/wasm-pack-action@0d096b08b4e5a7de8c28de67e11e945404e9eefa  #v0.4.0
@@ -434,7 +441,7 @@ jobs:
   #         # Pin to version 0.12.1
   #         version: 'v0.12.1'
   #     - name: Add rust-src
-  #       run: rustup component add rust-src --toolchain nightly-2025-02-17
+  #       run: rustup component add rust-src --toolchain nightly-2025-05-01
   #     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
   #       with:
   #         persist-credentials: false
@@ -452,15 +459,21 @@ jobs:
   prove-and-verify-tests:
     permissions:
       contents: read
-    runs-on: non-gpu
+    runs-on: [ non-gpu, non-sgx ]
     needs: [build, library-tests, docs]
+    env:
+      EVM_VERIFIER_EZKL_TOKEN: ${{ secrets.EVM_VERIFIER_EZKL_TOKEN }}
+      RUSTFLAGS: "-C target-feature=+atomics,+bulk-memory"
+
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
         with:
           persist-credentials: false
-      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+
+
+      - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
         with:
-          toolchain: nightly-2025-02-17
+          toolchain: nightly-2025-05-01
           override: true
           components: rustfmt, clippy
       - uses: jetli/wasm-pack-action@0d096b08b4e5a7de8c28de67e11e945404e9eefa  #v0.4.0
@@ -471,7 +484,7 @@ jobs:
         run: rustup target add wasm32-unknown-unknown
 
       - name: Add rust-src
-        run: rustup component add rust-src --toolchain nightly-2025-02-17-x86_64-unknown-linux-gnu
+        run: rustup component add rust-src --toolchain nightly-2025-05-01-x86_64-unknown-linux-gnu
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
         with:
           persist-credentials: false
@@ -497,9 +510,6 @@ jobs:
       - name: Build wasm package for nodejs target.
         run: |
           wasm-pack build --target nodejs --out-dir ./tests/wasm/nodejs . -- -Z build-std="panic_abort,std"
-      - name: Replace memory definition in nodejs
-        run: |
-          sed -i "3s|.*|imports['env'] = {memory: new WebAssembly.Memory({initial:20,maximum:65536,shared:true})}|" tests/wasm/nodejs/ezkl.js
       - name: KZG prove and verify tests (public outputs + column overflow)
         run: cargo nextest run --verbose tests::kzg_prove_and_verify_with_overflow_::w
       - name: KZG prove and verify tests (public outputs + fixed params + column overflow)
@@ -539,13 +549,13 @@ jobs:
   #     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
   # with:
   #   persist-credentials: false
-  #     - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+  #     - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
   #       with:
-  #         toolchain: nightly-2025-02-17
+  #         toolchain: nightly-2025-05-01
   #         override: true
   #         components: rustfmt, clippy
   #     - name: Add rust-src
-  #       run: rustup component add rust-src --toolchain nightly-2025-02-17-x86_64-unknown-linux-gnu
+  #       run: rustup component add rust-src --toolchain nightly-2025-05-01-x86_64-unknown-linux-gnu
   #     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
   #     - uses: baptiste0928/cargo-install@91c5da15570085bcde6f4d7aed98cb82d6769fd3  #v3.3.0
   #       with:
@@ -573,13 +583,18 @@ jobs:
       contents: read
     runs-on: self-hosted
     needs: [build, library-tests, docs, python-tests, python-integration-tests]
+    env:
+      EVM_VERIFIER_EZKL_TOKEN: ${{ secrets.EVM_VERIFIER_EZKL_TOKEN }}
+
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
         with:
           persist-credentials: false
+
+
       - uses: dtolnay/rust-toolchain@4f94fbe7e03939b0e674bcc9ca609a16088f63ff  #nightly branch, TODO: update when required
         with:
-          toolchain: nightly-2025-02-17
+          toolchain: nightly-2025-05-01
           override: true
           components: rustfmt, clippy
       - uses: baptiste0928/cargo-install@91c5da15570085bcde6f4d7aed98cb82d6769fd3  #v3.3.0
@@ -597,9 +612,9 @@ jobs:
   #     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
   # with:
   #   persist-credentials: false
-  #     - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+  #     - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
   #       with:
-  #         toolchain: nightly-2025-02-17
+  #         toolchain: nightly-2025-05-01
   #         override: true
   #         components: rustfmt, clippy
   #     - uses: baptiste0928/cargo-install@91c5da15570085bcde6f4d7aed98cb82d6769fd3  #v3.3.0
@@ -614,13 +629,18 @@ jobs:
       contents: read
     runs-on: large-self-hosted
     needs: [build, library-tests, docs, python-tests, python-integration-tests]
+    env:
+      EVM_VERIFIER_EZKL_TOKEN: ${{ secrets.EVM_VERIFIER_EZKL_TOKEN }}
+
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
         with:
           persist-credentials: false
-      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+
+
+      - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
         with:
-          toolchain: nightly-2025-02-17
+          toolchain: nightly-2025-05-01
           override: true
           components: rustfmt, clippy
       - uses: baptiste0928/cargo-install@91c5da15570085bcde6f4d7aed98cb82d6769fd3  #v3.3.0
@@ -635,13 +655,18 @@ jobs:
       contents: read
     runs-on: large-self-hosted
     needs: [build, library-tests, docs, python-tests, python-integration-tests]
+    env:
+      EVM_VERIFIER_EZKL_TOKEN: ${{ secrets.EVM_VERIFIER_EZKL_TOKEN }}
+
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
         with:
           persist-credentials: false
-      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+
+
+      - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
         with:
-          toolchain: nightly-2025-02-17
+          toolchain: nightly-2025-05-01
           override: true
           components: rustfmt, clippy
       - uses: baptiste0928/cargo-install@91c5da15570085bcde6f4d7aed98cb82d6769fd3  #v3.3.0
@@ -651,7 +676,7 @@ jobs:
       # - name: Install solc
       #   run: (hash svm 2>/dev/null || cargo install svm-rs) && svm install 0.8.20 && solc --version
       - name: Install Anvil
-        run: cargo install --git https://github.com/foundry-rs/foundry --rev 62cdea8ff9e6efef011f77e295823b5f2dbeb3a1 --locked anvil --force
+        run: cargo install --git https://github.com/foundry-rs/foundry --rev 56b806a3ba7866a3b061093bebd0fa2ace97f1fc --locked anvil --force
       - name: KZG prove and verify aggr tests
         run: cargo nextest run  --verbose tests_evm::kzg_evm_aggr_prove_and_verify_::t --test-threads 4 -- --include-ignored
 
@@ -660,13 +685,18 @@ jobs:
       contents: read
     runs-on: ubuntu-latest-32-cores
     needs: [build, library-tests, docs]
+    env:
+      EVM_VERIFIER_EZKL_TOKEN: ${{ secrets.EVM_VERIFIER_EZKL_TOKEN }}
+
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
         with:
           persist-credentials: false
-      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+
+
+      - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
         with:
-          toolchain: nightly-2025-02-17
+          toolchain: nightly-2025-05-01
           override: true
           components: rustfmt, clippy
       - uses: baptiste0928/cargo-install@91c5da15570085bcde6f4d7aed98cb82d6769fd3  #v3.3.0
@@ -679,18 +709,23 @@ jobs:
   python-tests:
     permissions:
       contents: read
-    runs-on: non-gpu
+    runs-on: [ non-gpu, non-sgx ]
     needs: [build, library-tests, docs]
+    env:
+      EVM_VERIFIER_EZKL_TOKEN: ${{ secrets.EVM_VERIFIER_EZKL_TOKEN }}
+
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
         with:
           persist-credentials: false
+
+
       - uses: actions/setup-python@b64ffcaf5b410884ad320a9cfac8866006a109aa  #v4.8.0
         with:
           python-version: "3.12"
-      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+      - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
         with:
-          toolchain: nightly-2025-02-17
+          toolchain: nightly-2025-05-01
           override: true
           components: rustfmt, clippy
       - name: Install cmake
@@ -700,27 +735,32 @@ jobs:
       - name: Setup Virtual Env and Install python dependencies
         run: python -m venv .env --clear; source .env/bin/activate; pip install -r requirements.txt;
       - name: Install Anvil
-        run: cargo install --git https://github.com/foundry-rs/foundry --rev 62cdea8ff9e6efef011f77e295823b5f2dbeb3a1 --locked anvil --force
+        run: cargo install --git https://github.com/foundry-rs/foundry --rev 56b806a3ba7866a3b061093bebd0fa2ace97f1fc --locked anvil --force
       - name: Build python ezkl
-        run: source .env/bin/activate; unset CONDA_PREFIX; maturin develop --features python-bindings --profile=test-runs
+        run: source .env/bin/activate; unset CONDA_PREFIX; maturin develop --features python-bindings,reusable-verifier --profile=test-runs
       - name: Run pytest
         run: source .env/bin/activate; pip install pytest-asyncio; pytest -vv
 
   accuracy-measurement-tests:
     permissions:
       contents: read
-    runs-on: non-gpu
+    runs-on: [ non-gpu, non-sgx ]
     needs: [build, library-tests, docs, python-tests, python-integration-tests]
+    env:
+      EVM_VERIFIER_EZKL_TOKEN: ${{ secrets.EVM_VERIFIER_EZKL_TOKEN }}
+
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
         with:
           persist-credentials: false
+
+
       - uses: actions/setup-python@b64ffcaf5b410884ad320a9cfac8866006a109aa  #v4.8.0
         with:
           python-version: "3.12"
-      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+      - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
         with:
-          toolchain: nightly-2025-02-17
+          toolchain: nightly-2025-05-01
           override: true
           components: rustfmt, clippy
       - uses: baptiste0928/cargo-install@91c5da15570085bcde6f4d7aed98cb82d6769fd3  #v3.3.0
@@ -730,7 +770,7 @@ jobs:
       - name: Setup Virtual Env and Install python dependencies
         run: python -m venv .env --clear; source .env/bin/activate; pip install -r requirements.txt;
       - name: Build python ezkl
-        run: source .env/bin/activate; unset CONDA_PREFIX; maturin develop --features python-bindings --profile=test-runs
+        run: source .env/bin/activate; unset CONDA_PREFIX; maturin develop --features python-bindings,reusable-verifier --profile=test-runs
       - name: Public inputs
         run: source .env/bin/activate; cargo nextest run --verbose tests::accuracy_measurement_public_inputs_
       - name: fixed params
@@ -744,34 +784,21 @@ jobs:
     permissions:
       contents: read
     runs-on: large-self-hosted
-    services:
-      # Label used to access the service container
-      postgres:
-        # Docker Hub image
-        image: postgres
-        env:
-          POSTGRES_USER: ubuntu
-          POSTGRES_HOST_AUTH_METHOD: trust
-        # Set health checks to wait until postgres has started
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-          -v /var/run/postgresql:/var/run/postgresql
-        ports:
-          # Maps tcp port 5432 on service container to the host
-          - 5432:5432
+    env:
+      EVM_VERIFIER_EZKL_TOKEN: ${{ secrets.EVM_VERIFIER_EZKL_TOKEN }}
+
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
         with:
           persist-credentials: false
+
+
       - uses: actions/setup-python@b64ffcaf5b410884ad320a9cfac8866006a109aa  #v4.8.0
         with:
           python-version: "3.11"
-      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+      - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
         with:
-          toolchain: nightly-2025-02-17
+          toolchain: nightly-2025-05-01
           override: true
           components: rustfmt, clippy
       - uses: baptiste0928/cargo-install@91c5da15570085bcde6f4d7aed98cb82d6769fd3  #v3.3.0
@@ -781,13 +808,13 @@ jobs:
       # - name: Install solc
       #   run: (hash svm 2>/dev/null || cargo install svm-rs) && svm install 0.8.20 && solc --version
       - name: Install Anvil
-        run: cargo install --git https://github.com/foundry-rs/foundry --rev 62cdea8ff9e6efef011f77e295823b5f2dbeb3a1 --locked anvil --force
+        run: cargo install --git https://github.com/foundry-rs/foundry --rev 56b806a3ba7866a3b061093bebd0fa2ace97f1fc --locked anvil --force
       - name: Install pip
         run: python -m ensurepip --upgrade
       - name: Setup Virtual Env and Install python dependencies
         run: python -m venv .env --clear; source .env/bin/activate; pip install -r requirements.txt; python -m ensurepip --upgrade
       - name: Build python ezkl
-        run: source .env/bin/activate; unset CONDA_PREFIX; maturin develop --features python-bindings --profile=test-runs
+        run: source .env/bin/activate; unset CONDA_PREFIX; maturin develop --features python-bindings,reusable-verifier --profile=test-runs
       - name: Cat and Dog notebook
         run: source .env/bin/activate; cargo nextest run py_tests::tests::cat_and_dog_notebook_
       - name: All notebooks
@@ -798,8 +825,6 @@ jobs:
         run: source .env/bin/activate; cargo nextest run py_tests::tests::neural_bag_of_words_ --no-capture
       - name: Felt conversion
         run: source .env/bin/activate; cargo nextest run py_tests::tests::felt_conversion_test_ --no-capture
-      - name: Postgres tutorials
-        run: source .env/bin/activate; cargo nextest run py_tests::tests::postgres_ --no-capture
       - name: Tictactoe tutorials
         run: source .env/bin/activate; cargo nextest run py_tests::tests::tictactoe_ --test-threads 1
       # - name: authenticate-kaggle-cli
@@ -814,19 +839,26 @@ jobs:
       - name: NBEATS tutorial
         run: source .env/bin/activate; cargo nextest run py_tests::tests::nbeats_
       # - name: Reusable verifier tutorial
-      # run: source .env/bin/activate; cargo nextest run py_tests::tests::reusable_
+      # run: source .env/bin/activate; cargo nextest run py_tests::tests::reusable_verifier_ --no-capture
+      - name: Reusable verifier tutorial
+        run: source .env/bin/activate; cargo nextest run py_tests::tests::reusable_verifier_ --no-capture --test-threads 1
 
   ios-integration-tests:
     permissions:
       contents: read
     runs-on: macos-latest
+    env:
+      EVM_VERIFIER_EZKL_TOKEN: ${{ secrets.EVM_VERIFIER_EZKL_TOKEN }}
+
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
         with:
           persist-credentials: false
-      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+
+
+      - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
         with:
-          toolchain: nightly-2025-02-17
+          toolchain: nightly-2025-05-01
           override: true
           components: rustfmt, clippy
       - uses: baptiste0928/cargo-install@91c5da15570085bcde6f4d7aed98cb82d6769fd3  #v3.3.0
@@ -834,7 +866,7 @@ jobs:
           crate: cargo-nextest
           locked: true
       - name: Run ios tests
-        run: CARGO_BUILD_TARGET=aarch64-apple-darwin RUSTUP_TOOLCHAIN=nightly-2025-02-17-aarch64-apple-darwin cargo test --test ios_integration_tests --features ios-bindings-test --no-default-features
+        run: CARGO_BUILD_TARGET=aarch64-apple-darwin RUSTUP_TOOLCHAIN=nightly-2025-05-01-aarch64-apple-darwin cargo test --test ios_integration_tests --features ios-bindings-test --no-default-features
 
   swift-package-tests:
     permissions:
@@ -842,13 +874,17 @@ jobs:
     runs-on: macos-latest
     needs: [ios-integration-tests]
 
+    env:
+      EVM_VERIFIER_EZKL_TOKEN: ${{ secrets.EVM_VERIFIER_EZKL_TOKEN }}
+
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  #v4.2.2
         with:
           persist-credentials: false
-      - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f  #v1.0.6
+
+      - uses: actions-rust-lang/setup-rust-toolchain@fb51252c7ba57d633bc668f941da052e410add48  #v1.0.6
         with:
-          toolchain: nightly-2025-02-17
+          toolchain: nightly-2025-05-01
           override: true
           components: rustfmt, clippy
       - name: Build EzklCoreBindings

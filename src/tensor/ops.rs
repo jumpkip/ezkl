@@ -160,7 +160,7 @@ pub fn decompose(
 ///
 /// let result = trilu(&a, 0, false).unwrap();
 /// let expected = Tensor::<IntegerRep>::new(Some(&[1, 0, 3, 4, 5, 6]), &[1, 3, 2]).unwrap();
-/// assert_eq!(result, expected);  
+/// assert_eq!(result, expected);
 ///
 /// let result = trilu(&a, -1, true).unwrap();
 /// let expected = Tensor::<IntegerRep>::new(Some(&[1, 2, 3, 4, 0, 6]), &[1, 3, 2]).unwrap();
@@ -168,7 +168,7 @@ pub fn decompose(
 ///
 /// let result = trilu(&a, -1, false).unwrap();
 /// let expected = Tensor::<IntegerRep>::new(Some(&[0, 0, 3, 0, 5, 6]), &[1, 3, 2]).unwrap();
-/// assert_eq!(result, expected);  
+/// assert_eq!(result, expected);
 ///
 /// let a = Tensor::<IntegerRep>::new(
 ///   Some(&[1, 2, 3, 4, 5, 6]),
@@ -188,7 +188,7 @@ pub fn decompose(
 ///
 /// let result = trilu(&a, 0, false).unwrap();
 /// let expected = Tensor::<IntegerRep>::new(Some(&[1, 0, 0, 4, 5, 0]), &[1, 2, 3]).unwrap();
-/// assert_eq!(result, expected);  
+/// assert_eq!(result, expected);
 ///
 /// let result = trilu(&a, -1, true).unwrap();
 /// let expected = Tensor::<IntegerRep>::new(Some(&[1, 2, 3, 4, 5, 6]), &[1, 2, 3]).unwrap();
@@ -196,7 +196,7 @@ pub fn decompose(
 ///
 /// let result = trilu(&a, -1, false).unwrap();
 /// let expected = Tensor::<IntegerRep>::new(Some(&[0, 0, 0, 4, 0, 0]), &[1, 2, 3]).unwrap();
-/// assert_eq!(result, expected);  
+/// assert_eq!(result, expected);
 ///
 /// let a = Tensor::<IntegerRep>::new(
 ///   Some(&[1, 2, 3, 4, 5, 6, 7, 8, 9]),
@@ -216,7 +216,7 @@ pub fn decompose(
 ///
 /// let result = trilu(&a, 0, false).unwrap();
 /// let expected = Tensor::<IntegerRep>::new(Some(&[1, 0, 0, 4, 5, 0, 7, 8, 9]), &[1, 3, 3]).unwrap();
-/// assert_eq!(result, expected);  
+/// assert_eq!(result, expected);
 ///
 /// let result = trilu(&a, -1, true).unwrap();
 /// let expected = Tensor::<IntegerRep>::new(Some(&[1, 2, 3, 4, 5, 6, 0, 8, 9]), &[1, 3, 3]).unwrap();
@@ -224,7 +224,7 @@ pub fn decompose(
 ///
 /// let result = trilu(&a, -1, false).unwrap();
 /// let expected = Tensor::<IntegerRep>::new(Some(&[0, 0, 0, 4, 0, 0, 7, 8, 0]), &[1, 3, 3]).unwrap();
-/// assert_eq!(result, expected);  
+/// assert_eq!(result, expected);
 /// ```
 pub fn trilu<T: TensorType + std::marker::Send + std::marker::Sync>(
     a: &Tensor<T>,
@@ -329,7 +329,7 @@ pub fn resize<T: TensorType + Send + Sync>(
 
     let cartesian_coord: Vec<Vec<usize>> = new_shape
         .iter()
-        .map(|d| (0..*d))
+        .map(|d| 0..*d)
         .multi_cartesian_product()
         .collect();
 
@@ -916,11 +916,14 @@ pub fn gather_elements<T: TensorType + Send + Sync>(
 /// let expected = Tensor::<IntegerRep>::new(Some(&[2, 7]), &[2]).unwrap();
 /// assert_eq!(result, expected);
 ///
-pub fn gather_nd<T: TensorType + Send + Sync>(
-    input: &Tensor<T>,
+pub fn gather_nd<'a, T: TensorType + Send + Sync + 'a>(
+    input: &'a Tensor<T>,
     index: &Tensor<usize>,
     batch_dims: usize,
-) -> Result<Tensor<T>, TensorError> {
+) -> Result<Tensor<T>, TensorError>
+where
+    &'a T: TensorType,
+{
     // Calculate the output tensor size
     let index_dims = index.dims().to_vec();
     let input_dims = input.dims().to_vec();
@@ -1108,11 +1111,14 @@ pub fn gather_nd<T: TensorType + Send + Sync>(
 /// assert_eq!(result, expected);
 /// ````
 ///
-pub fn scatter_nd<T: TensorType + Send + Sync>(
+pub fn scatter_nd<'a, T: TensorType + Send + Sync + 'a>(
     input: &Tensor<T>,
     index: &Tensor<usize>,
-    src: &Tensor<T>,
-) -> Result<Tensor<T>, TensorError> {
+    src: &'a Tensor<T>,
+) -> Result<Tensor<T>, TensorError>
+where
+    &'a T: TensorType,
+{
     // Calculate the output tensor size
     let index_dims = index.dims().to_vec();
     let input_dims = input.dims().to_vec();
@@ -1183,12 +1189,12 @@ pub fn abs<T: TensorType + Add<Output = T> + std::cmp::Ord + Neg<Output = T>>(
 /// use ezkl::tensor::ops::intercalate_values;
 ///
 /// let tensor = Tensor::<IntegerRep>::new(Some(&[1, 2, 3, 4]), &[2, 2]).unwrap();
-/// let result = intercalate_values(&tensor, 0, 2, 1).unwrap();
+/// let result = intercalate_values(&tensor, &0, 2, 1).unwrap();
 ///
 /// let expected = Tensor::<IntegerRep>::new(Some(&[1, 0, 2, 3, 0, 4]), &[2, 3]).unwrap();
 /// assert_eq!(result, expected);
 ///
-/// let result = intercalate_values(&expected, 0, 2, 0).unwrap();
+/// let result = intercalate_values(&expected, &0, 2, 0).unwrap();
 /// let expected = Tensor::<IntegerRep>::new(Some(&[1, 0, 2, 0, 0, 0, 3, 0, 4]), &[3, 3]).unwrap();
 ///
 /// assert_eq!(result, expected);
@@ -1196,7 +1202,7 @@ pub fn abs<T: TensorType + Add<Output = T> + std::cmp::Ord + Neg<Output = T>>(
 /// ```
 pub fn intercalate_values<T: TensorType>(
     tensor: &Tensor<T>,
-    value: T,
+    value: &T,
     stride: usize,
     axis: usize,
 ) -> Result<Tensor<T>, TensorError> {
@@ -1212,7 +1218,7 @@ pub fn intercalate_values<T: TensorType>(
     let cartesian_coord = output
         .dims()
         .iter()
-        .map(|d| (0..*d))
+        .map(|d| 0..*d)
         .multi_cartesian_product()
         .collect::<Vec<_>>();
 
@@ -1257,7 +1263,7 @@ pub fn one_hot(
     let cartesian_coord = output
         .dims()
         .iter()
-        .map(|d| (0..*d))
+        .map(|d| 0..*d)
         .multi_cartesian_product()
         .collect::<Vec<_>>();
 
@@ -1335,7 +1341,7 @@ pub fn pad<T: TensorType>(
     let cartesian_coord = image
         .dims()
         .iter()
-        .map(|d| (0..*d))
+        .map(|d| 0..*d)
         .multi_cartesian_product()
         .collect::<Vec<_>>();
 
@@ -1494,7 +1500,7 @@ pub fn slice<T: TensorType + Send + Sync>(
         }
     }
 
-    t.get_slice(&slice)
+    Ok(t.get_slice(&slice)?)
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -1859,14 +1865,14 @@ pub mod nonlinearities {
     ///     Some(&[4, 25, 8, 1, 1, 1]),
     ///     &[2, 3],
     /// ).unwrap();
-    /// let result = rsqrt(&x, 1.0);
+    /// let result = rsqrt(&x, 1.0, f64::EPSILON);
     /// let expected = Tensor::<IntegerRep>::new(Some(&[1, 0, 0, 1, 1, 1]), &[2, 3]).unwrap();
     /// assert_eq!(result, expected);
     /// ```
-    pub fn rsqrt(a: &Tensor<IntegerRep>, scale_input: f64) -> Tensor<IntegerRep> {
+    pub fn rsqrt(a: &Tensor<IntegerRep>, scale_input: f64, eps: f64) -> Tensor<IntegerRep> {
         a.par_enum_map(|_, a_i| {
             let kix = (a_i as f64) / scale_input;
-            let fout = scale_input / (kix.sqrt() + f64::EPSILON);
+            let fout = scale_input / (kix.sqrt() + eps);
             let rounded = fout.round();
             Ok::<_, TensorError>(rounded as IntegerRep)
         })
@@ -2339,15 +2345,20 @@ pub mod nonlinearities {
     ///     &[2, 3],
     /// ).unwrap();
     /// let k = 2_f64;
-    /// let result = recip(&x, 1.0, k);
+    /// let result = recip(&x, 1.0, k, f64::EPSILON);
     /// let expected = Tensor::<IntegerRep>::new(Some(&[1, 2, 1, 0, 2, 2]), &[2, 3]).unwrap();
     /// assert_eq!(result, expected);
     /// ```
-    pub fn recip(a: &Tensor<IntegerRep>, input_scale: f64, out_scale: f64) -> Tensor<IntegerRep> {
+    pub fn recip(
+        a: &Tensor<IntegerRep>,
+        input_scale: f64,
+        out_scale: f64,
+        eps: f64,
+    ) -> Tensor<IntegerRep> {
         a.par_enum_map(|_, a_i| {
             let rescaled = (a_i as f64) / input_scale;
             let denom = if rescaled == 0_f64 {
-                (1_f64) / (rescaled + f64::EPSILON)
+                (1_f64) / (rescaled + eps)
             } else {
                 (1_f64) / (rescaled)
             };
@@ -2366,16 +2377,16 @@ pub mod nonlinearities {
     /// use ezkl::fieldutils::IntegerRep;
     /// use ezkl::tensor::ops::nonlinearities::zero_recip;
     /// let k = 2_f64;
-    /// let result = zero_recip(1.0);
+    /// let result = zero_recip(1.0, f64::EPSILON);
     /// let expected = Tensor::<IntegerRep>::new(Some(&[4503599627370496]), &[1]).unwrap();
     /// assert_eq!(result, expected);
     /// ```
-    pub fn zero_recip(out_scale: f64) -> Tensor<IntegerRep> {
+    pub fn zero_recip(out_scale: f64, eps: f64) -> Tensor<IntegerRep> {
         let a = Tensor::<IntegerRep>::new(Some(&[0]), &[1]).unwrap();
 
         a.par_enum_map(|_, a_i| {
             let rescaled = a_i as f64;
-            let denom = (1_f64) / (rescaled + f64::EPSILON);
+            let denom = (1_f64) / (rescaled + eps);
             let d_inv_x = out_scale * denom;
             Ok::<_, TensorError>(d_inv_x.round() as IntegerRep)
         })
@@ -2409,20 +2420,20 @@ pub mod accumulated {
     ///     Some(&[25, 35]),
     ///     &[2],
     /// ).unwrap();
-    /// assert_eq!(dot(&[x, y], 1).unwrap(), expected);
+    /// assert_eq!(dot(&x, &y, 1).unwrap(), expected);
     /// ```
     pub fn dot<T: TensorType + Mul<Output = T> + Add<Output = T>>(
-        inputs: &[Tensor<T>; 2],
+        a: &Tensor<T>,
+        b: &Tensor<T>,
         chunk_size: usize,
     ) -> Result<Tensor<T>, TensorError> {
-        if inputs[0].clone().len() != inputs[1].clone().len() {
+        if a.len() != b.len() {
             return Err(TensorError::DimMismatch("dot".to_string()));
         }
-        let (a, b): (Tensor<T>, Tensor<T>) = (inputs[0].clone(), inputs[1].clone());
 
         let transcript: Tensor<T> = a
             .iter()
-            .zip(b)
+            .zip(b.iter())
             .chunks(chunk_size)
             .into_iter()
             .scan(T::zero().unwrap(), |acc, chunk| {

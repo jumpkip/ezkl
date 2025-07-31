@@ -23,14 +23,19 @@
 )]
 // we allow this for our dynamic range based indexing scheme
 #![allow(clippy::single_range_in_vec_init)]
-#![feature(buf_read_has_data_left)]
 #![feature(stmt_expr_attributes)]
 
 //! A library for turning computational graphs, such as neural networks, into ZK-circuits.
 //!
 use log::warn;
-#[cfg(all(feature = "ezkl", not(target_arch = "wasm32")))]
-use mimalloc as _;
+
+#[global_allocator]
+#[cfg(all(feature = "jemalloc", not(target_arch = "wasm32")))]
+static GLOBAL: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
+#[global_allocator]
+#[cfg(all(feature = "mimalloc", not(target_arch = "wasm32")))]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 /// Error type
 // #[cfg_attr(not(feature = "ezkl"), derive(uniffi::Error))]
@@ -44,6 +49,7 @@ pub enum EZKLError {
         not(all(target_arch = "wasm32", target_os = "unknown"))
     ))]
     #[error("[eth] {0}")]
+    #[cfg(all(feature = "eth", not(target_arch = "wasm32")))]
     EthError(#[from] eth::EthError),
     #[error("[graph] {0}")]
     GraphError(#[from] graph::errors::GraphError),
@@ -124,7 +130,7 @@ pub fn version() -> &'static str {
 
 /// Bindings management
 #[cfg(any(
-    feature = "ios-bindings",
+    feature = "universal-bindings",
     all(target_arch = "wasm32", target_os = "unknown"),
     feature = "python-bindings"
 ))]
@@ -134,7 +140,7 @@ pub mod circuit;
 /// CLI commands.
 #[cfg(all(feature = "ezkl", not(target_arch = "wasm32")))]
 pub mod commands;
-#[cfg(all(feature = "ezkl", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "eth", not(target_arch = "wasm32")))]
 // abigen doesn't generate docs for this module
 #[allow(missing_docs)]
 /// Utility functions for contracts
@@ -151,7 +157,7 @@ pub mod fieldutils;
 pub mod graph;
 /// beautiful logging
 #[cfg(all(
-    feature = "ezkl",
+    feature = "logging",
     not(all(target_arch = "wasm32", target_os = "unknown"))
 ))]
 pub mod logger;
@@ -282,6 +288,10 @@ pub struct RunArgs {
     /// Higher values provide more precision but increase circuit complexity
     #[cfg_attr(all(feature = "ezkl", not(target_arch = "wasm32")), arg(long, default_value = "7", value_hint = clap::ValueHint::Other))]
     pub param_scale: Scale,
+    /// Scale to rebase to when the input scale exceeds rebase_scale * multiplier. If None we rebase to the max of input_scale and param_scale
+    /// This is an advanced parameter that should be used with caution
+    #[cfg_attr(all(feature = "ezkl", not(target_arch = "wasm32")), arg(long, required = false, value_hint = clap::ValueHint::Other))]
+    pub rebase_scale: Option<Scale>,
     /// Scale rebase threshold multiplier
     /// When scale exceeds input_scale * multiplier, it is rebased to input_scale
     /// Advanced parameter that should be used with caution
@@ -350,6 +360,16 @@ pub struct RunArgs {
         arg(long, default_value = "false")
     )]
     pub ignore_range_check_inputs_outputs: bool,
+    /// Optional override for epsilon value
+    #[cfg_attr(all(feature = "ezkl", not(target_arch = "wasm32")), arg(long))]
+    pub epsilon: Option<f64>,
+}
+
+impl RunArgs {
+    /// Returns the epsilon value
+    pub fn get_epsilon(&self) -> f64 {
+        self.epsilon.unwrap_or(f64::EPSILON)
+    }
 }
 
 impl Default for RunArgs {
@@ -362,6 +382,7 @@ impl Default for RunArgs {
             bounded_log_lookup: false,
             input_scale: 7,
             param_scale: 7,
+            rebase_scale: None,
             scale_rebase_multiplier: 1,
             lookup_range: (-32768, 32768),
             logrows: 17,
@@ -376,6 +397,7 @@ impl Default for RunArgs {
             decomp_base: 16384,
             decomp_legs: 2,
             ignore_range_check_inputs_outputs: false,
+            epsilon: None,
         }
     }
 }
